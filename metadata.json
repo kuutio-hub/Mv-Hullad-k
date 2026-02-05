@@ -1,0 +1,5 @@
+{
+  "name": "Martonvásár Hulladéknaptár 2026",
+  "description": "Egy interaktív hulladéknaptár Martonvásár 2026-os gyűjtési időpontjaival. Lehetővé teszi az iCal formátumú naptár letöltését és arra való feliratkozást.",
+  "requestFramePermissions": []
+}
