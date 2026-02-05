@@ -1,105 +1,104 @@
 
-import { getCalendarData } from './services/dataService.js';
-import { renderApp, renderError } from './services/uiService.js';
-import { generateWasteIcal, generateNameDayIcal } from './services/icalService.js';
+const modalContainer = document.getElementById('modal-container');
+const subscribeButtons = document.querySelectorAll('.subscribe-btn');
 
-// --- STATE MANAGEMENT ---
-const state = {
-    currentDate: new Date(Date.UTC(2026, 0, 1)),
-    viewMode: 'monthly', // 'monthly' or 'annual'
-    showNameDays: false,
-    calendarData: {},
-    nameDays: [],
-    isLoading: true,
-};
-
-// --- CORE APPLICATION LOGIC ---
-
-async function updateAndRender() {
-    try {
-        state.isLoading = true;
-        renderApp(state); // Show loading spinner
-
-        const year = state.currentDate.getUTCFullYear();
-        const data = await getCalendarData(year);
-        state.calendarData = data.calendarData;
-        state.nameDays = data.nameDays;
-        
-        state.isLoading = false;
-        renderApp(state);
-    } catch (error) {
-        console.error("Failed to update and render application:", error);
-        state.isLoading = false;
-        renderError("Hiba történt a naptár adatainak betöltése közben. Kérjük, próbálja újra később.");
+const calendarInfo = {
+    waste: {
+        title: "Hulladéknaptár",
+        fileName: "martonvasar_hulladek",
+        icon: "fa-recycle",
+        color: "var(--marton-blue)"
+    },
+    nameday: {
+        title: "Magyar Névnapok",
+        fileName: "magyar_nevnapok",
+        icon: "fa-cake-candles",
+        color: "var(--marton-green)"
     }
-}
-
-// --- EVENT HANDLERS ---
-
-const handlers = {
-    navigate: (unit, direction) => {
-        const currentYear = state.currentDate.getUTCFullYear();
-        const currentMonth = state.currentDate.getUTCMonth();
-        let newYear = currentYear;
-        let newMonth = currentMonth;
-
-        if (unit === 'month') {
-            newMonth += direction;
-        } else if (unit === 'year') {
-            newYear += direction;
-        }
-        
-        state.currentDate = new Date(Date.UTC(newYear, newMonth, 1));
-        updateAndRender();
-    },
-    setToday: () => {
-        const today = new Date();
-        state.currentDate = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()));
-        updateAndRender();
-    },
-    toggleNameDays: () => {
-        state.showNameDays = !state.showNameDays;
-        renderApp(state); // No need to fetch data again, just re-render
-    },
-    toggleView: (view) => {
-        if (state.viewMode !== view) {
-            state.viewMode = view;
-            renderApp(state);
-        }
-    },
-    printView: () => window.print(),
-    downloadWasteIcal: async () => {
-        const wasteData = await getCalendarData(2026, true); // Force fetching only waste data for 2026
-        const icalContent = generateWasteIcal(wasteData.calendarData);
-        downloadFile('Martonvasar_Hulladeknaptar_2026.ics', icalContent, 'text/calendar;charset=utf-8');
-    },
-    downloadNameDayIcal: () => {
-        const year = state.currentDate.getUTCFullYear();
-        const icalContent = generateNameDayIcal(state.nameDays, year);
-        downloadFile(`Magyar_Nevnapok_${year}.ics`, icalContent, 'text/calendar;charset=utf-8');
-    },
 };
 
-function downloadFile(filename, content, mimeType) {
-    const blob = new Blob([content], { type: mimeType });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(link.href);
+function showSubscriptionModal(calendarType, year) {
+    const info = calendarInfo[calendarType];
+    if (!info) return;
+
+    const calendarUrl = `${window.location.protocol}//${window.location.host}${window.location.pathname.replace('index.html', '')}data/${info.fileName}_${year}.ics`;
+
+    const modalHtml = `
+        <div class="modal-overlay">
+            <div class="modal-content">
+                <button class="modal-close-btn">&times;</button>
+                <div class="modal-header" style="--card-color: ${info.color};">
+                    <i class="fa-solid ${info.icon}"></i>
+                    <h2>${info.title} ${year}</h2>
+                </div>
+                <div class="modal-body">
+                    <p>A naptárra való feliratkozáshoz használja az alábbi URL-t. A legtöbb naptáralkalmazás (Google, Apple, Outlook) támogatja naptárak hozzáadását URL-ből.</p>
+                    
+                    <div class="url-container">
+                        <input type="text" id="calendar-url-input" value="${calendarUrl}" readonly>
+                        <button id="copy-url-btn" title="URL Másolása"><i class="fa-solid fa-copy"></i></button>
+                    </div>
+                    <div id="copy-feedback" class="copy-feedback">URL a vágólapra másolva!</div>
+
+                    <h3>Segédlet a feliratkozáshoz</h3>
+                    <div class="instructions">
+                        <p><strong><i class="fa-brands fa-google"></i> Google Naptár (számítógépen):</strong></p>
+                        <ol>
+                            <li>Nyissa meg a Google Naptárat.</li>
+                            <li>A bal oldali menüben, a "Más naptárak" mellett kattintson a <strong>+</strong> jelre.</li>
+                            <li>Válassza az "<strong>URL-ből</strong>" opciót.</li>
+                            <li>Illessze be a fent kimásolt URL-t, és kattintson a "Naptár felvétele" gombra.</li>
+                        </ol>
+                    </div>
+                     <div class="instructions">
+                        <p><strong><i class="fa-brands fa-apple"></i> Apple Naptár (iPhone/iPad):</strong></p>
+                        <ol>
+                            <li>Lépjen a Beállítások > Naptár > Fiókok > Fiók hozzáadása menüpontba.</li>
+                            <li>Válassza az "<strong>Egyéb</strong>", majd az "<strong>Előfizetett naptár hozzáadása</strong>" lehetőséget.</li>
+                            <li>Illessze be a kimásolt URL-t a "Szerver" mezőbe, majd koppintson a "Tovább" gombra.</li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    modalContainer.innerHTML = modalHtml;
+    attachModalEvents();
 }
 
-// --- INITIALIZATION ---
+function attachModalEvents() {
+    const overlay = document.querySelector('.modal-overlay');
+    const closeBtn = document.querySelector('.modal-close-btn');
+    const copyBtn = document.getElementById('copy-url-btn');
 
-// Expose state and handlers to the global scope so uiService can access them
-window.app = {
-    state,
-    handlers,
-};
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) {
+            closeModal();
+        }
+    });
 
-// Initial render
-document.addEventListener('DOMContentLoaded', () => {
-    updateAndRender();
+    closeBtn.addEventListener('click', closeModal);
+
+    copyBtn.addEventListener('click', () => {
+        const urlInput = document.getElementById('calendar-url-input');
+        navigator.clipboard.writeText(urlInput.value).then(() => {
+            const feedback = document.getElementById('copy-feedback');
+            feedback.classList.add('visible');
+            setTimeout(() => {
+                feedback.classList.remove('visible');
+            }, 2000);
+        });
+    });
+}
+
+function closeModal() {
+    modalContainer.innerHTML = '';
+}
+
+subscribeButtons.forEach(button => {
+    button.addEventListener('click', () => {
+        const calendarType = button.dataset.calendar;
+        const year = button.dataset.year;
+        showSubscriptionModal(calendarType, year);
+    });
 });
